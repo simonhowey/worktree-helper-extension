@@ -1,0 +1,160 @@
+{
+  "name": "worktree-helper",
+  "displayName": "Worktree Helper",
+  "description": "Makes each git worktree window visually distinct and context-aware: titlebar color, branch/color env vars, and auto-opened terminals.",
+  "version": "0.1.0",
+  "publisher": "simonhowey",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.103.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "worktree",
+    "titlebar",
+    "terminal",
+    "environment"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "worktreeHelper.reapply",
+        "title": "Worktree Helper: Re-apply Config"
+      },
+      {
+        "command": "worktreeHelper.clean",
+        "title": "Worktree Helper: Clean Up This Window"
+      },
+      {
+        "command": "worktreeHelper.pickColor",
+        "title": "Worktree Helper: Pick Titlebar Color"
+      }
+    ],
+    "configuration": {
+      "title": "Worktree Helper",
+      "properties": {
+        "worktreeHelper.autoApply": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Automatically apply worktree config (color, env, terminals) when a linked worktree window is opened."
+        },
+        "worktreeHelper.applyToMainWorktree": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Also apply config to the primary working tree, not just linked worktrees."
+        },
+        "worktreeHelper.terminals": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Terminals to open in the worktree. Each runs in the worktree folder, then executes `command`.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "command"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Terminal tab name."
+              },
+              "command": {
+                "type": "string",
+                "description": "Command to run when the terminal opens."
+              }
+            }
+          }
+        },
+        "worktreeHelper.palette": {
+          "type": "array",
+          "default": [
+            "#1565c0",
+            "#2e7d32",
+            "#c62828",
+            "#6a1b9a",
+            "#ad6800",
+            "#00838f",
+            "#4527a0",
+            "#37474f",
+            "#ad1457",
+            "#558b2f",
+            "#d84315",
+            "#00695c",
+            "#283593",
+            "#9e9d24",
+            "#5d4037",
+            "#0277bd"
+          ],
+          "markdownDescription": "Candidate titlebar background colors (hex). New worktrees pick the most distinct unused color from this list.",
+          "items": {
+            "type": "string",
+            "pattern": "^#([0-9a-fA-F]{6})$"
+          }
+        },
+        "worktreeHelper.colorOverride": {
+          "type": "string",
+          "default": "",
+          "pattern": "^(#([0-9a-fA-F]{6}))?$",
+          "markdownDescription": "Force a specific titlebar background color (hex) for this workspace. Leave empty to auto-pick."
+        },
+        "worktreeHelper.injectEnv": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Inject `GIT_BRANCH` and the titlebar color into integrated terminals."
+        },
+        "worktreeHelper.writeEnvFile": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Write a git-excluded `.env` file at the worktree root so debuggers and tasks can read the vars."
+        },
+        "worktreeHelper.branchEnvVar": {
+          "type": "string",
+          "default": "GIT_BRANCH",
+          "description": "Environment variable name holding the branch name."
+        },
+        "worktreeHelper.colorEnvVar": {
+          "type": "string",
+          "default": "WORKTREE_COLOR",
+          "description": "Environment variable name holding the titlebar color."
+        },
+        "worktreeHelper.openTerminals": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Open the configured `worktreeHelper.terminals` when a worktree is set up."
+        },
+        "worktreeHelper.gitExcludeWrites": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Add files we write (`.vscode/settings.json`, `.env`) to `.git/info/exclude` so they don't pollute git."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.103.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}
