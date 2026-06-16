@@ -41,6 +41,10 @@
       {
         "command": "worktreeHelper.pickColor",
         "title": "Worktree Helper: Pick Titlebar Color"
+      },
+      {
+        "command": "worktreeHelper.runSetup",
+        "title": "Worktree Helper: Run Setup Commands"
       }
     ],
     "configuration": {
@@ -55,6 +59,14 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Also apply config to the primary working tree, not just linked worktrees."
+        },
+        "worktreeHelper.setupCommands": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Commands to run **once** when a worktree is first set up (e.g. `npm install`, copying untracked config). They run sequentially in the worktree folder as VS Code tasks, stopping at the first failure, and re-run on the next open until they all succeed. Unlike `#worktreeHelper.terminals#`, these are expected to finish — use terminals for long-running processes like dev servers. Re-run on demand with the *Worktree Helper: Run Setup Commands* command.",
+          "items": {
+            "type": "string"
+          }
         },
         "worktreeHelper.terminals": {
           "type": "array",

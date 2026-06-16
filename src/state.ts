@@ -20,6 +20,25 @@ export function clearApplied(ctx: vscode.ExtensionContext, commonDir: string, wo
   return ctx.workspaceState.update(markerKey(commonDir, worktreePath), undefined);
 }
 
+// Separate, durable marker for run-once setup commands. Deliberately NOT cleared
+// by `reapply`/`clean` (those refresh visuals/env, not the worktree's bootstrap),
+// so setup like `npm install` runs once per worktree and not on every re-apply.
+function setupKey(commonDir: string, worktreePath: string): string {
+  return `setup:${commonDir}:${worktreePath}`;
+}
+
+export function isSetupDone(ctx: vscode.ExtensionContext, commonDir: string, worktreePath: string): boolean {
+  return ctx.workspaceState.get<boolean>(setupKey(commonDir, worktreePath)) === true;
+}
+
+export function setSetupDone(ctx: vscode.ExtensionContext, commonDir: string, worktreePath: string): Thenable<void> {
+  return ctx.workspaceState.update(setupKey(commonDir, worktreePath), true);
+}
+
+export function clearSetupDone(ctx: vscode.ExtensionContext, commonDir: string, worktreePath: string): Thenable<void> {
+  return ctx.workspaceState.update(setupKey(commonDir, worktreePath), undefined);
+}
+
 const COLOR_CACHE = 'colorCache';
 
 type ColorCache = Record<string, string>;

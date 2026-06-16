@@ -10,7 +10,9 @@ other way), this extension automatically:
 - **b) Injects environment variables** — the branch name (`GIT_BRANCH`) and the titlebar color
   (`WORKTREE_COLOR`) — into integrated terminals and, via a generated file, into debug/task
   processes.
-- **c) Opens configured terminals** in the worktree folder, each running a program you specify.
+- **c) Runs one-time setup commands** (e.g. `npm install`, copying untracked config) when a
+  worktree is first set up — run as tasks, awaited, and re-tried until they succeed.
+- **d) Opens configured terminals** in the worktree folder, each running a program you specify.
 
 It does **not** create worktrees — VS Code 1.103+ already does that. This extension reacts to a
 worktree being opened and configures the window.
@@ -25,9 +27,13 @@ On activation (`onStartupFinished`, in every window) the extension:
 3. Resolves the branch (`git branch --show-current`, falling back to a short SHA on detached HEAD).
 4. Picks/reuses a color, writes the `titleBar.*` keys into the workspace `.vscode/settings.json`.
 5. Injects the env vars and writes `.env.worktree`.
-6. Opens the configured terminals — **once per worktree** (guarded so reloads don't duplicate them).
+6. Runs `setupCommands` sequentially — **once per worktree**, awaited so terminals start only
+   after setup finishes. Marked done only when every command exits 0, so a failure re-runs next open.
+7. Opens the configured terminals — **once per worktree** (guarded so reloads don't duplicate them).
 
-Color and env reconcile on every activation; terminals are opened only on first setup.
+Color and env reconcile on every activation; setup commands and terminals run only on first setup.
+The setup marker is independent of the apply marker, so *Re-apply Config* refreshes visuals/env
+**without** re-running setup. Re-run setup explicitly with *Run Setup Commands*.
 
 ## Environment variables for debug & tasks
 
@@ -62,6 +68,7 @@ All under `worktreeHelper.*`:
 |---|---|---|
 | `autoApply` | `true` | Apply automatically when a linked worktree is opened |
 | `applyToMainWorktree` | `false` | Also configure the primary working tree |
+| `setupCommands` | `[]` | `["npm install", ...]` — commands run **once** on first setup (sequential, stop on first failure) |
 | `terminals` | `[]` | `[{ "name": "...", "command": "..." }]` — terminals to open (omit/empty `command` → plain terminal) |
 | `palette` | 16 colors | Candidate titlebar background colors (hex) |
 | `colorOverride` | `""` | Force a specific color for this workspace |
@@ -84,9 +91,23 @@ Example — open a dev server and a shell in every worktree:
 A terminal with no `command` (omitted, or `"command": ""`) opens as a plain terminal — nothing
 is run, just a shell in the worktree folder.
 
+Example — install deps and seed local config once per worktree:
+
+```json
+"worktreeHelper.setupCommands": [
+  "npm install",
+  "cp ../main/.env.local .env.local"
+]
+```
+
+`setupCommands` vs `terminals`: setup commands are run **once** and expected to *finish* (the
+window waits for them before opening terminals); terminals are for long-running processes like
+dev servers. Put `npm install` in `setupCommands`, `npm run dev` in `terminals`.
+
 ## Commands
 
-- **Worktree Helper: Re-apply Config** — clear the marker and run the pipeline again (re-opens terminals).
+- **Worktree Helper: Re-apply Config** — clear the marker and run the pipeline again (re-opens terminals; does **not** re-run setup).
+- **Worktree Helper: Run Setup Commands** — re-run `setupCommands` now, ignoring the once-per-worktree marker.
 - **Worktree Helper: Clean Up This Window** — remove our titlebar colors, clear env vars, delete `.env.worktree`.
 - **Worktree Helper: Pick Titlebar Color** — choose a palette color manually, or auto-pick the most distinct.
 

@@ -12,10 +12,14 @@ import {
 } from './titlebar';
 import { applyEnv, clearEnv } from './env';
 import { openTerminals, hasOurTerminals } from './terminals';
+import { runSetupCommands } from './setup';
 import {
   isApplied,
   setApplied,
   clearApplied,
+  isSetupDone,
+  setSetupDone,
+  clearSetupDone,
   getCachedColor,
   setCachedColor,
 } from './state';
@@ -27,6 +31,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('worktreeHelper.reapply', () => reapply(context)),
     vscode.commands.registerCommand('worktreeHelper.clean', () => clean(context)),
     vscode.commands.registerCommand('worktreeHelper.pickColor', () => pickColor(context)),
+    vscode.commands.registerCommand('worktreeHelper.runSetup', () => runSetup(context)),
   );
   void applyWorktreeConfig(context, false);
 }
@@ -121,9 +126,26 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
     await ensureGitExclude(repo.commonDir, patterns);
   }
 
+  const envRecord = { [config.branchEnvVar]: repo.branch, [config.colorEnvVar]: background };
+
+  // Setup commands — run once per worktree, awaited so terminals (e.g. dev servers)
+  // start only after setup (e.g. install) finishes. Marked done only on success, so
+  // a failed command retries on the next open instead of being silently skipped.
+  if (config.setupCommands.length && !isSetupDone(context, repo.commonDir, folder.uri.fsPath)) {
+    log(`Running ${config.setupCommands.length} setup command(s) for ${repo.branch}…`);
+    if (await runSetupCommands(folder, config.setupCommands, envRecord)) {
+      await setSetupDone(context, repo.commonDir, folder.uri.fsPath);
+      log('Setup commands completed.');
+    } else {
+      log('Setup commands failed — will retry on next open.');
+      vscode.window.showWarningMessage(
+        'Worktree Helper: setup commands failed. See the Worktree Helper output for details.',
+      );
+    }
+  }
+
   // Terminals — open once per worktree (guarded so reloads don't duplicate)
   if (config.openTerminals && firstApply && !hasOurTerminals()) {
-    const envRecord = { [config.branchEnvVar]: repo.branch, [config.colorEnvVar]: background };
     const opened = openTerminals(folder.uri.fsPath, config.terminals, envRecord);
     log(`Opened ${opened} terminal(s) for ${repo.branch}.`);
   }
@@ -140,6 +162,27 @@ async function reapply(context: vscode.ExtensionContext): Promise<void> {
     await clearApplied(context, resolved.repo.commonDir, resolved.folder.uri.fsPath);
   }
   await applyWorktreeConfig(context, true);
+}
+
+/** Force-runs setup commands now, regardless of the once-per-worktree marker. */
+async function runSetup(context: vscode.ExtensionContext): Promise<void> {
+  const config = getConfig(activeFolder()?.uri);
+  const resolved = await resolveContext(config);
+  if (!resolved) {
+    return;
+  }
+  const { folder, repo } = resolved;
+  if (!config.setupCommands.length) {
+    vscode.window.showInformationMessage('Worktree Helper: no setupCommands configured.');
+    return;
+  }
+  const background = getCurrentBackground(folder) ?? getCachedColor(context, folder.uri.fsPath) ?? '';
+  const envRecord = { [config.branchEnvVar]: repo.branch, [config.colorEnvVar]: background };
+  await clearSetupDone(context, repo.commonDir, folder.uri.fsPath);
+  if (await runSetupCommands(folder, config.setupCommands, envRecord)) {
+    await setSetupDone(context, repo.commonDir, folder.uri.fsPath);
+    vscode.window.showInformationMessage('Worktree Helper: setup commands completed.');
+  }
 }
 
 async function clean(context: vscode.ExtensionContext): Promise<void> {
