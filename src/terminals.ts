@@ -21,7 +21,7 @@ export function openTerminals(
 ): number {
   let opened = 0;
   for (const spec of specs) {
-    if (!spec?.name || typeof spec.command !== 'string') {
+    if (!spec?.name) {
       continue;
     }
     const terminal = vscode.window.createTerminal({
@@ -29,7 +29,8 @@ export function openTerminals(
       cwd,
       env,
     });
-    if (spec.command.trim()) {
+    // No command (omitted or empty) → leave a plain terminal open.
+    if (typeof spec.command === 'string' && spec.command.trim()) {
       // sendText queues until the shell is ready, so this is safe at open time.
       terminal.sendText(spec.command);
     }

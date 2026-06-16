@@ -59,12 +59,11 @@
         "worktreeHelper.terminals": {
           "type": "array",
           "default": [],
-          "markdownDescription": "Terminals to open in the worktree. Each runs in the worktree folder, then executes `command`.",
+          "markdownDescription": "Terminals to open in the worktree. Each runs in the worktree folder, then executes `command`. Omit `command` (or leave it empty) to open a plain terminal with nothing run.",
           "items": {
             "type": "object",
             "required": [
-              "name",
-              "command"
+              "name"
             ],
             "properties": {
               "name": {
@@ -73,7 +72,8 @@
               },
               "command": {
                 "type": "string",
-                "description": "Command to run when the terminal opens."
+                "default": "",
+                "description": "Command to run when the terminal opens. Omit or leave empty to open a plain terminal."
               }
             }
           }

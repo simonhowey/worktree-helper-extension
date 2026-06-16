@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 
 export interface TerminalSpec {
   name: string;
-  command: string;
+  /** Command to run on open. Omitted/empty → a plain terminal with no command. */
+  command?: string;
 }
 
 export interface WorktreeConfig {

@@ -62,7 +62,7 @@ All under `worktreeHelper.*`:
 |---|---|---|
 | `autoApply` | `true` | Apply automatically when a linked worktree is opened |
 | `applyToMainWorktree` | `false` | Also configure the primary working tree |
-| `terminals` | `[]` | `[{ "name": "...", "command": "..." }]` — terminals to open |
+| `terminals` | `[]` | `[{ "name": "...", "command": "..." }]` — terminals to open (omit/empty `command` → plain terminal) |
 | `palette` | 16 colors | Candidate titlebar background colors (hex) |
 | `colorOverride` | `""` | Force a specific color for this workspace |
 | `injectEnv` | `true` | Inject env vars into terminals |
@@ -77,9 +77,12 @@ Example — open a dev server and a shell in every worktree:
 ```json
 "worktreeHelper.terminals": [
   { "name": "dev",   "command": "npm run dev" },
-  { "name": "shell", "command": "" }
+  { "name": "shell" }
 ]
 ```
+
+A terminal with no `command` (omitted, or `"command": ""`) opens as a plain terminal — nothing
+is run, just a shell in the worktree folder.
 
 ## Commands
 
