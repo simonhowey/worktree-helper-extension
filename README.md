@@ -1,11 +1,11 @@
 # Worktree Helper
 
 Makes each git **worktree** window visually distinct and context-aware. When you open a
-worktree (via VS Code's built-in *Git: Create Worktree* → *Open Worktree in New Window*, or any
+worktree (via VS Code's built-in _Git: Create Worktree_ → _Open Worktree in New Window_, or any
 other way), this extension automatically:
 
 - **a) Colors the titlebar** with a color picked from a palette, chosen to be the most distinct
-  from the colors already used by the repo's other worktrees — so each window is recognisable at
+  from the colors already used by the repo's other worktrees — so each window is recognizable at
   a glance, with a readable (auto-contrasting) foreground.
 - **b) Injects environment variables** — the branch name (`GIT_BRANCH`) and the titlebar color
   (`WORKTREE_COLOR`) — into integrated terminals and, via a generated file, into debug/task
@@ -32,8 +32,8 @@ On activation (`onStartupFinished`, in every window) the extension:
 7. Opens the configured terminals — **once per worktree** (guarded so reloads don't duplicate them).
 
 Color and env reconcile on every activation; setup commands and terminals run only on first setup.
-The setup marker is independent of the apply marker, so *Re-apply Config* refreshes visuals/env
-**without** re-running setup. Re-run setup explicitly with *Run Setup Commands*.
+The setup marker is independent of the apply marker, so _Re-apply Config_ refreshes visuals/env
+**without** re-running setup. Re-run setup explicitly with _Run Setup Commands_.
 
 ## Environment variables for debug & tasks
 
@@ -64,20 +64,20 @@ silently.
 
 All under `worktreeHelper.*`:
 
-| Setting | Default | Description |
-|---|---|---|
-| `autoApply` | `true` | Apply automatically when a linked worktree is opened |
-| `applyToMainWorktree` | `false` | Also configure the primary working tree |
-| `setupCommands` | `[]` | `["npm install", ...]` — commands run **once** on first setup (sequential, stop on first failure) |
-| `terminals` | `[]` | `[{ "name": "...", "command": "..." }]` — terminals to open (omit/empty `command` → plain terminal) |
-| `palette` | 16 colors | Candidate titlebar background colors (hex) |
-| `colorOverride` | `""` | Force a specific color for this workspace |
-| `injectEnv` | `true` | Inject env vars into terminals |
-| `writeEnvFile` | `true` | Write `.env.worktree` for debug/tasks |
-| `branchEnvVar` | `GIT_BRANCH` | Branch env var name |
-| `colorEnvVar` | `WORKTREE_COLOR` | Color env var name |
-| `openTerminals` | `true` | Open the configured terminals |
-| `gitExcludeWrites` | `true` | Add our files to `.git/info/exclude` |
+| Setting               | Default          | Description                                                                                         |
+| --------------------- | ---------------- | --------------------------------------------------------------------------------------------------- |
+| `autoApply`           | `true`           | Apply automatically when a linked worktree is opened                                                |
+| `applyToMainWorktree` | `false`          | Also configure the primary working tree                                                             |
+| `setupCommands`       | `[]`             | `["npm install", ...]` — commands run **once** on first setup (sequential, stop on first failure)   |
+| `terminals`           | `[]`             | `[{ "name": "...", "command": "..." }]` — terminals to open (omit/empty `command` → plain terminal) |
+| `palette`             | 16 colors        | Candidate titlebar background colors (hex)                                                          |
+| `colorOverride`       | `""`             | Force a specific color for this workspace                                                           |
+| `injectEnv`           | `true`           | Inject env vars into terminals                                                                      |
+| `writeEnvFile`        | `true`           | Write `.env.worktree` for debug/tasks                                                               |
+| `branchEnvVar`        | `GIT_BRANCH`     | Branch env var name                                                                                 |
+| `colorEnvVar`         | `WORKTREE_COLOR` | Color env var name                                                                                  |
+| `openTerminals`       | `true`           | Open the configured terminals                                                                       |
+| `gitExcludeWrites`    | `true`           | Add our files to `.git/info/exclude`                                                                |
 
 Example — open a dev server and a shell in every worktree:
 
@@ -100,7 +100,7 @@ Example — install deps and seed local config once per worktree:
 ]
 ```
 
-`setupCommands` vs `terminals`: setup commands are run **once** and expected to *finish* (the
+`setupCommands` vs `terminals`: setup commands are run **once** and expected to _finish_ (the
 window waits for them before opening terminals); terminals are for long-running processes like
 dev servers. Put `npm install` in `setupCommands`, `npm run dev` in `terminals`.
 
@@ -128,5 +128,5 @@ npm run package    # produce a .vsix
 - **`.vscode/settings.json`**: coloring must be written here (there's no in-memory API for
   `colorCustomizations`). It's added to `.git/info/exclude` by default. Already-tracked files are
   unaffected by exclude and will still show in `git status`.
-- There is no VS Code API to inject env into *all* debug sessions automatically; `.env.worktree` is
+- There is no VS Code API to inject env into _all_ debug sessions automatically; `.env.worktree` is
   the portable artifact for that.
