@@ -5,6 +5,9 @@ esbuild.mjs
 tsconfig.json
 .gitignore
 .git/**
+.claude/**
+*.vsix
+package-lock.json
 **/*.map
 **/*.ts
 !dist/extension.js
