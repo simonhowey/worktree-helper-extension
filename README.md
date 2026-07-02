@@ -42,7 +42,7 @@ extension also writes a git-excluded **`.env.worktree`** at the worktree root:
 
 ```
 GIT_BRANCH=feature/login
-WORKTREE_COLOR=#1565c0
+WORKTREE_COLOR=#446b9a
 ```
 
 It writes a **dedicated** file (not your `.env`) so it never clobbers an existing, possibly secret-
@@ -70,7 +70,7 @@ All under `worktreeHelper.*`:
 | `applyToMainWorktree` | `false`          | Also configure the primary working tree                                                             |
 | `setupCommands`       | `[]`             | `["npm install", ...]` — commands run **once** on first setup (sequential, stop on first failure)   |
 | `terminals`           | `[]`             | `[{ "name": "...", "command": "..." }]` — terminals to open (omit/empty `command` → plain terminal) |
-| `palette`             | 16 colors        | Candidate titlebar background colors (hex)                                                          |
+| `palette`             | 8 colors         | Candidate titlebar background colors (hex)                                                          |
 | `colorOverride`       | `""`             | Force a specific color for this workspace                                                           |
 | `injectEnv`           | `true`           | Inject env vars into terminals                                                                      |
 | `writeEnvFile`        | `true`           | Write `.env.worktree` for debug/tasks                                                               |
