@@ -152,7 +152,8 @@
     "build": "node esbuild.mjs --production",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies",
+    "reinstall": "vsce package --no-dependencies -o worktree-helper.vsix && code --install-extension worktree-helper.vsix --force"
   },
   "devDependencies": {
     "@types/node": "^20.x",
