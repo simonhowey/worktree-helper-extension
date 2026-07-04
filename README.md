@@ -53,6 +53,53 @@ bearing `.env`. Point your tooling at it:
 - **Tasks** (`tasks.json`): reference the values via `options.env`, or rely on the terminal env
 - Any tool that loads dotenv files can read it directly
 
+## Dev containers
+
+The extension declares `"extensionKind": ["workspace", "ui"]`: it prefers running next
+to the workspace, and falls back to the UI (local) extension host in windows whose
+remote doesn't have it installed — which is how a local install activates in
+dev-container windows and drives the remote through the VS Code API. Don't install it
+inside the container via `devcontainer.json` `customizations.vscode.extensions` unless
+you've published it to a registry the container can reach.
+
+**On WSL**, note that the "UI" host is the *Windows* VS Code, not the WSL server: a copy
+installed only in WSL never activates in dev-container windows. Install the `.vsix` on
+**both** sides (`code --install-extension` from WSL *and* from Windows). WSL windows
+keep using the WSL copy (workspace-kind preferred, full functionality); dev-container
+windows use the Windows copy, which cannot reach WSL paths and therefore runs degraded:
+titlebar color (from the worktree's existing settings) and terminals, but no git-derived
+env and no `.env.worktree` write. Open the worktree once as a plain WSL window first and
+those files get created for the container to use.
+
+It works best when the container mounts the worktree at the **identical absolute path**,
+e.g. in `devcontainer.json`:
+
+```json
+"workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind"
+```
+
+(plus a matching mount for the main checkout's `.git`). Git runs on the host, so the
+host and container must see the same paths.
+
+In a container window you get:
+
+- the titlebar color (settings service — works the same as locally);
+- the auto-opened `🌿` terminals, running **in the container**, with
+  `GIT_BRANCH`/`WORKTREE_COLOR` in their env (passed at terminal creation);
+- `.env.worktree`, written host-side and visible through the bind mount.
+
+Limitations there:
+
+- `injectEnv` (the terminal env API) is applied by the **local** extension host and does
+  not reach container terminals. Terminals you open manually in a container window get
+  the vars by sourcing `.env.worktree` from the shell profile instead.
+- `setupCommands` are **skipped** in dev-container windows — the container's
+  `postCreateCommand` owns bootstrap there. Set
+  `worktreeHelper.runSetupInDevContainer: true` to override; the explicit
+  _Run Setup Commands_ command always works.
+- Without identical-path mounts the extension degrades gracefully: cached titlebar color
+  and terminals still work; git-derived env, `.env.worktree`, and setup are skipped.
+
 ## Titlebar style requirement
 
 Titlebar colors only render with the **custom** title bar (`titleBar.*` keys are ignored on the
@@ -69,6 +116,7 @@ All under `worktreeHelper.*`:
 | `autoApply`           | `true`           | Apply automatically when a linked worktree is opened                                                |
 | `applyToMainWorktree` | `false`          | Also configure the primary working tree                                                             |
 | `setupCommands`       | `[]`             | `["npm install", ...]` — commands run **once** on first setup (sequential, stop on first failure)   |
+| `runSetupInDevContainer` | `false`       | Run `setupCommands` in dev-container windows too (normally `postCreateCommand` owns bootstrap)      |
 | `terminals`           | `[]`             | `[{ "name": "...", "command": "..." }]` — terminals to open (omit/empty `command` → plain terminal) |
 | `palette`             | 8 colors         | Candidate titlebar background colors (hex)                                                          |
 | `colorOverride`       | `""`             | Force a specific color for this workspace                                                           |

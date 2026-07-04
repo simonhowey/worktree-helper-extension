@@ -2,7 +2,7 @@
   "name": "worktree-helper",
   "displayName": "Worktree Helper",
   "description": "Makes each git worktree window visually distinct and context-aware: titlebar color, branch/color env vars, and auto-opened terminals.",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "publisher": "simonhowey",
   "license": "MIT",
   "engines": {
@@ -20,6 +20,10 @@
     "environment"
   ],
   "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace",
+    "ui"
+  ],
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -67,6 +71,11 @@
           "items": {
             "type": "string"
           }
+        },
+        "worktreeHelper.runSetupInDevContainer": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Run `#worktreeHelper.setupCommands#` in dev-container windows too. Off by default because the container's `postCreateCommand` normally owns bootstrap there. The *Run Setup Commands* command always works regardless."
         },
         "worktreeHelper.terminals": {
           "type": "array",

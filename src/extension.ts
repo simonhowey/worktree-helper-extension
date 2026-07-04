@@ -44,10 +44,14 @@ function activeFolder(): vscode.WorkspaceFolder | undefined {
   return vscode.workspace.workspaceFolders?.[0];
 }
 
-/** Resolve the repo context, gating on trust, a folder, git, and worktree status. */
+/**
+ * Resolve the repo context, gating on trust, a folder, and worktree status.
+ * `repo` is null when host-side git can't see the folder (not a repo, or a remote
+ * window whose path isn't mirrored on the host) — callers decide how to degrade.
+ */
 async function resolveContext(
   config: WorktreeConfig,
-): Promise<{ folder: vscode.WorkspaceFolder; repo: RepoContext; gitPath: string } | undefined> {
+): Promise<{ folder: vscode.WorkspaceFolder; repo: RepoContext | null; gitPath: string } | undefined> {
   if (!vscode.workspace.isTrusted) {
     log('Workspace not trusted — skipping.');
     return undefined;
@@ -59,10 +63,8 @@ async function resolveContext(
   const gitPath = getGitPath();
   const repo = await getRepoContext(gitPath, folder.uri.fsPath);
   if (!repo) {
-    log(`Not a git repository: ${folder.uri.fsPath}`);
-    return undefined;
-  }
-  if (!repo.isLinkedWorktree && !config.applyToMainWorktree) {
+    log(`Not a git repository (on the host): ${folder.uri.fsPath}`);
+  } else if (!repo.isLinkedWorktree && !config.applyToMainWorktree) {
     log('Main working tree (applyToMainWorktree is off) — skipping.');
     return undefined;
   }
@@ -103,6 +105,14 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
     return;
   }
   const { folder, repo, gitPath } = resolved;
+  if (!repo) {
+    // Remote window whose path isn't mirrored on the host (non-path-preserving
+    // mount): git is unusable there, but color + terminals still work.
+    if (vscode.env.remoteName) {
+      await applyDegradedRemote(context, folder, config, force);
+    }
+    return;
+  }
   const firstApply = force || !isApplied(context, repo.commonDir, folder.uri.fsPath);
 
   // Color + titlebar
@@ -132,21 +142,28 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
   // start only after setup (e.g. install) finishes. Marked done only on success, so
   // a failed command retries on the next open instead of being silently skipped.
   if (config.setupCommands.length && !isSetupDone(context, repo.commonDir, folder.uri.fsPath)) {
-    log(`Running ${config.setupCommands.length} setup command(s) for ${repo.branch}…`);
-    if (await runSetupCommands(folder, config.setupCommands, envRecord)) {
-      await setSetupDone(context, repo.commonDir, folder.uri.fsPath);
-      log('Setup commands completed.');
+    // In dev-container windows the container's postCreateCommand owns bootstrap, so
+    // don't run (or mark done) — the explicit Run Setup Commands command still works.
+    if (vscode.env.remoteName === 'dev-container' && !config.runSetupInDevContainer) {
+      log('Skipping setup commands in dev-container window (postCreateCommand owns bootstrap; set worktreeHelper.runSetupInDevContainer to override).');
     } else {
-      log('Setup commands failed — will retry on next open.');
-      vscode.window.showWarningMessage(
-        'Worktree Helper: setup commands failed. See the Worktree Helper output for details.',
-      );
+      log(`Running ${config.setupCommands.length} setup command(s) for ${repo.branch}…`);
+      if (await runSetupCommands(folder, config.setupCommands, envRecord)) {
+        await setSetupDone(context, repo.commonDir, folder.uri.fsPath);
+        log('Setup commands completed.');
+      } else {
+        log('Setup commands failed — will retry on next open.');
+        vscode.window.showWarningMessage(
+          'Worktree Helper: setup commands failed. See the Worktree Helper output for details.',
+        );
+      }
     }
   }
 
-  // Terminals — open once per worktree (guarded so reloads don't duplicate)
+  // Terminals — open once per worktree (guarded so reloads don't duplicate).
+  // cwd as Uri so it resolves remote-side in dev-container windows.
   if (config.openTerminals && firstApply && !hasOurTerminals()) {
-    const opened = openTerminals(folder.uri.fsPath, config.terminals, envRecord);
+    const opened = openTerminals(folder.uri, config.terminals, envRecord);
     log(`Opened ${opened} terminal(s) for ${repo.branch}.`);
   }
 
@@ -154,12 +171,41 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
   log(`Applied worktree config: branch=${repo.branch}, color=${background}.`);
 }
 
+// Sentinel in place of commonDir for the applied marker when git is unavailable.
+const NO_GIT = 'remote-no-git';
+
+/**
+ * Remote window whose path host-side git can't see (non-path-preserving mount):
+ * apply what still works — a cached/derivable titlebar color and remote-resolved
+ * terminals. No git-derived env, no env file, no setup, no popups.
+ */
+async function applyDegradedRemote(
+  context: vscode.ExtensionContext,
+  folder: vscode.WorkspaceFolder,
+  config: WorktreeConfig,
+  force: boolean,
+): Promise<void> {
+  log(`Degraded remote mode for ${folder.uri.toString()}: color + terminals only (no host-side git).`);
+  const background =
+    config.colorOverride || getCurrentBackground(folder) || getCachedColor(context, folder.uri.fsPath);
+  if (background) {
+    await applyTitlebar(folder, buildTitlebarColors(background));
+  }
+  const firstApply = force || !isApplied(context, NO_GIT, folder.uri.fsPath);
+  if (config.openTerminals && firstApply && !hasOurTerminals()) {
+    const env = background ? { [config.colorEnvVar]: background } : {};
+    const opened = openTerminals(folder.uri, config.terminals, env);
+    log(`Opened ${opened} terminal(s).`);
+  }
+  await setApplied(context, NO_GIT, folder.uri.fsPath);
+}
+
 async function reapply(context: vscode.ExtensionContext): Promise<void> {
   const folder = activeFolder();
   const config = getConfig(folder?.uri);
   const resolved = await resolveContext(config);
   if (resolved) {
-    await clearApplied(context, resolved.repo.commonDir, resolved.folder.uri.fsPath);
+    await clearApplied(context, resolved.repo?.commonDir ?? NO_GIT, resolved.folder.uri.fsPath);
   }
   await applyWorktreeConfig(context, true);
 }
@@ -168,10 +214,10 @@ async function reapply(context: vscode.ExtensionContext): Promise<void> {
 async function runSetup(context: vscode.ExtensionContext): Promise<void> {
   const config = getConfig(activeFolder()?.uri);
   const resolved = await resolveContext(config);
-  if (!resolved) {
+  if (!resolved?.repo) {
     return;
   }
-  const { folder, repo } = resolved;
+  const { folder, repo } = resolved; // repo non-null per the guard above
   if (!config.setupCommands.length) {
     vscode.window.showInformationMessage('Worktree Helper: no setupCommands configured.');
     return;

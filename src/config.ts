@@ -10,6 +10,7 @@ export interface WorktreeConfig {
   autoApply: boolean;
   applyToMainWorktree: boolean;
   setupCommands: string[];
+  runSetupInDevContainer: boolean;
   terminals: TerminalSpec[];
   palette: string[];
   colorOverride: string;
@@ -29,6 +30,7 @@ export function getConfig(scope?: vscode.ConfigurationScope): WorktreeConfig {
     autoApply: get('autoApply', true),
     applyToMainWorktree: get('applyToMainWorktree', false),
     setupCommands: get<string[]>('setupCommands', []),
+    runSetupInDevContainer: get('runSetupInDevContainer', false),
     terminals: get<TerminalSpec[]>('terminals', []),
     palette: get<string[]>('palette', []),
     colorOverride: get('colorOverride', '').trim(),

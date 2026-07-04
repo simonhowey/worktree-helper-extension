@@ -12,10 +12,11 @@ export function hasOurTerminals(): boolean {
 
 /**
  * Opens one terminal per spec in the worktree folder, seeded with `env`, then runs
- * each spec's command. Returns the number of terminals opened.
+ * each spec's command. Returns the number of terminals opened. `cwd` is a Uri so it
+ * resolves remote-side in dev-container windows (an fsPath string would not).
  */
 export function openTerminals(
-  cwd: string,
+  cwd: vscode.Uri,
   specs: TerminalSpec[],
   env: Record<string, string>,
 ): number {
