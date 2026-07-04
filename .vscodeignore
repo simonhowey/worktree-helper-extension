@@ -8,6 +8,7 @@ tsconfig.json
 .claude/**
 *.vsix
 package-lock.json
+TASK-*.md
 **/*.map
 **/*.ts
 !dist/extension.js

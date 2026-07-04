@@ -15,6 +15,15 @@ import { openTerminals, hasOurTerminals } from './terminals';
 import { runSetupCommands } from './setup';
 import { applySettingsTemplate, watchSettingsTemplate } from './settings-template';
 import {
+  markerExists,
+  createMarker,
+  deleteMarker,
+  reopenInContainer,
+  initPauseIndicator,
+  refreshPauseIndicator,
+  watchMarker,
+} from './container-pause';
+import {
   isApplied,
   setApplied,
   clearApplied,
@@ -33,12 +42,19 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('worktreeHelper.clean', () => clean(context)),
     vscode.commands.registerCommand('worktreeHelper.pickColor', () => pickColor(context)),
     vscode.commands.registerCommand('worktreeHelper.runSetup', () => runSetup(context)),
+    vscode.commands.registerCommand('worktreeHelper.stayInWsl', () => stayInWsl()),
+    vscode.commands.registerCommand('worktreeHelper.resumeAutoContainer', () => resumeAutoContainer()),
   );
+  initPauseIndicator(context);
   const folder = activeFolder();
   const templateRel = getConfig(folder?.uri).settingsTemplate;
   if (folder && templateRel) {
     context.subscriptions.push(watchSettingsTemplate(folder, templateRel));
   }
+  if (folder) {
+    context.subscriptions.push(watchMarker(folder));
+  }
+  void refreshPauseIndicator(folder);
   void applyWorktreeConfig(context, false);
 }
 
@@ -229,16 +245,44 @@ async function maybeReopenInContainer(
   if (!(await hasDevcontainerConfig(folder.uri))) {
     return false;
   }
-  log(`Dev container config found in ${folder.name} — reopening in container.`);
-  try {
-    // Commands resolve across extension hosts — don't getExtension()-check first:
-    // Dev Containers lives in the UI host, invisible from a WSL/SSH workspace host.
-    await vscode.commands.executeCommand('remote-containers.reopenInContainer');
-  } catch (e) {
-    log(`Reopen in Container failed — is the Dev Containers extension installed? (${String(e)})`);
+  // Escape hatch: a sticky marker file lets the user deliberately stay in WSL.
+  // Checked on every activation/reapply, never auto-removed — a mid-session
+  // reload must not bounce back into the container. The paused indicator is
+  // shown by refreshPauseIndicator (run at activation and by the marker watcher).
+  if (await markerExists(folder)) {
+    log('.vscode/wsl-only present — staying in WSL, skipping auto-reopen.');
     return false;
   }
-  return true;
+  log(`Dev container config found in ${folder.name} — reopening in container.`);
+  return reopenInContainer();
+}
+
+/** Create the marker so this WSL window (and future opens) stay out of the container. */
+async function stayInWsl(): Promise<void> {
+  const folder = activeFolder();
+  if (!folder) {
+    return;
+  }
+  await createMarker(folder);
+  await refreshPauseIndicator(folder);
+  vscode.window.showInformationMessage(
+    'Worktree Helper: staying in WSL — auto-reopen paused (.vscode/wsl-only). Resume from the status bar.',
+  );
+}
+
+/** Remove the marker and hand the folder back to the dev container. */
+async function resumeAutoContainer(): Promise<void> {
+  const folder = activeFolder();
+  if (!folder) {
+    return;
+  }
+  await deleteMarker(folder);
+  await refreshPauseIndicator(folder);
+  if (!(await reopenInContainer())) {
+    vscode.window.showWarningMessage(
+      'Worktree Helper: could not reopen in container — is the Dev Containers extension installed?',
+    );
+  }
 }
 
 async function hasDevcontainerConfig(root: vscode.Uri): Promise<boolean> {

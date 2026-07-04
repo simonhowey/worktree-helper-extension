@@ -75,9 +75,21 @@ those files get created for the container to use.
 repo's `.vscode/settings.json`), any worktree window that opens *outside* a container —
 local, WSL, or SSH — and finds `.devcontainer/devcontainer.json` (or `.devcontainer.json`)
 is immediately reopened in its dev container, skipping local setup/terminals (they run in
-the container window instead). Caveat: while it's on, *Reopen Folder Locally* bounces
-straight back into the container; flip the setting off (the file is editable from the
-container window) to work locally.
+the container window instead).
+
+**Staying in WSL (escape hatch)**: while auto-reopen is on, *Reopen Folder Locally* / *Reopen
+Folder in WSL* would bounce straight back into the container. To deliberately stay outside,
+create a marker file `.vscode/wsl-only` in the workspace root — its presence pauses
+auto-reopen. It's **sticky**: honored until you remove it, so mid-session reloads (extension
+updates, settings changes) don't bounce you back in.
+
+- From a **container** terminal (where no Worktree Helper command exists): `touch .vscode/wsl-only`, then palette → *Reopen Folder in WSL*. The WSL window stays put, with a `$(debug-pause) auto-container paused` status-bar item.
+- From a **WSL** window: run *Worktree Helper: Stay in WSL (pause auto-container)* — creates the marker, no reload needed.
+- **Resume**: click the status-bar item, run *Worktree Helper: Resume auto-container*, or just `rm .vscode/wsl-only`.
+
+The marker's contents don't matter (existence only). `.vscode/` is already present in
+worktrees (we generate `settings.json` there). If your repo's `.gitignore` doesn't already
+cover `.vscode/*`, add `.vscode/wsl-only` so the marker stays untracked.
 
 It works best when the container mounts the worktree at the **identical absolute path**,
 e.g. in `devcontainer.json`:
@@ -191,6 +203,8 @@ dev servers. Put `npm install` in `setupCommands`, `npm run dev` in `terminals`.
 - **Worktree Helper: Run Setup Commands** — re-run `setupCommands` now, ignoring the once-per-worktree marker.
 - **Worktree Helper: Clean Up This Window** — remove our titlebar colors, clear env vars, delete `.env.worktree`.
 - **Worktree Helper: Pick Titlebar Color** — choose a palette color manually, or auto-pick the most distinct.
+- **Worktree Helper: Stay in WSL (pause auto-container)** — create `.vscode/wsl-only` so auto-reopen-in-container is paused (see [Dev containers](#dev-containers)).
+- **Worktree Helper: Resume auto-container** — delete the marker and reopen in the container.
 
 ## Development
 

@@ -2,7 +2,7 @@
   "name": "worktree-helper",
   "displayName": "Worktree Helper",
   "description": "Makes each git worktree window visually distinct and context-aware: titlebar color, branch/color env vars, and auto-opened terminals.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "simonhowey",
   "license": "MIT",
   "engines": {
@@ -49,6 +49,14 @@
       {
         "command": "worktreeHelper.runSetup",
         "title": "Worktree Helper: Run Setup Commands"
+      },
+      {
+        "command": "worktreeHelper.stayInWsl",
+        "title": "Worktree Helper: Stay in WSL (pause auto-container)"
+      },
+      {
+        "command": "worktreeHelper.resumeAutoContainer",
+        "title": "Worktree Helper: Resume auto-container"
       }
     ],
     "configuration": {
