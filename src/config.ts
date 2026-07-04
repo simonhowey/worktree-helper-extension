@@ -9,6 +9,8 @@ export interface TerminalSpec {
 export interface WorktreeConfig {
   autoApply: boolean;
   applyToMainWorktree: boolean;
+  autoReopenInContainer: boolean;
+  settingsTemplate: string;
   setupCommands: string[];
   runSetupInDevContainer: boolean;
   terminals: TerminalSpec[];
@@ -29,6 +31,8 @@ export function getConfig(scope?: vscode.ConfigurationScope): WorktreeConfig {
   return {
     autoApply: get('autoApply', true),
     applyToMainWorktree: get('applyToMainWorktree', false),
+    autoReopenInContainer: get('autoReopenInContainer', false),
+    settingsTemplate: get('settingsTemplate', '.vscode/settings.shared.json').trim(),
     setupCommands: get<string[]>('setupCommands', []),
     runSetupInDevContainer: get('runSetupInDevContainer', false),
     terminals: get<TerminalSpec[]>('terminals', []),

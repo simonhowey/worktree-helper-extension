@@ -71,6 +71,14 @@ titlebar color (from the worktree's existing settings) and terminals, but no git
 env and no `.env.worktree` write. Open the worktree once as a plain WSL window first and
 those files get created for the container to use.
 
+**Auto-reopen**: with `worktreeHelper.autoReopenInContainer: true` (best checked into the
+repo's `.vscode/settings.json`), any worktree window that opens *outside* a container —
+local, WSL, or SSH — and finds `.devcontainer/devcontainer.json` (or `.devcontainer.json`)
+is immediately reopened in its dev container, skipping local setup/terminals (they run in
+the container window instead). Caveat: while it's on, *Reopen Folder Locally* bounces
+straight back into the container; flip the setting off (the file is editable from the
+container window) to work locally.
+
 It works best when the container mounts the worktree at the **identical absolute path**,
 e.g. in `devcontainer.json`:
 
@@ -100,6 +108,29 @@ Limitations there:
 - Without identical-path mounts the extension degrades gracefully: cached titlebar color
   and terminals still work; git-derived env, `.env.worktree`, and setup are skipped.
 
+## Settings template (untracked settings.json)
+
+The titlebar colors are written to `.vscode/settings.json` — and when a repo *tracks* that
+file, every worktree shows it perpetually modified (`.git/info/exclude` can't hide tracked
+files). The fix: stop tracking `settings.json` and track a template instead.
+
+1. `git mv .vscode/settings.json .vscode/settings.shared.json` (drop any
+   `workbench.colorCustomizations` block), and gitignore `/.vscode/settings.json`.
+2. Done — whenever `settings.shared.json` exists, the extension deep-merges it into
+   `settings.json` on window open and live on template edits.
+
+Merge rules: template wins for every key it defines (objects recurse, arrays/scalars are
+replaced); keys it doesn't define — the colors, local additions — are untouched; a `null`
+value in the template deletes the key. Comments and formatting in `settings.json` are
+preserved (edits are key-scoped), but treat the template as the place for hand edits:
+template-owned keys in `settings.json` get overwritten on the next merge.
+
+This step deliberately runs in **every trusted window** — main checkout, linked worktree,
+or dev container — not just worktrees, because the generated `settings.json` is the only
+per-folder settings file VS Code reads. Caveat: on a machine without this extension,
+nothing generates `settings.json`, so the repo's editor config doesn't apply until the
+extension runs once (or the template is copied by hand).
+
 ## Titlebar style requirement
 
 Titlebar colors only render with the **custom** title bar (`titleBar.*` keys are ignored on the
@@ -115,6 +146,8 @@ All under `worktreeHelper.*`:
 | --------------------- | ---------------- | --------------------------------------------------------------------------------------------------- |
 | `autoApply`           | `true`           | Apply automatically when a linked worktree is opened                                                |
 | `applyToMainWorktree` | `false`          | Also configure the primary working tree                                                             |
+| `autoReopenInContainer` | `false`        | Auto-run *Reopen in Container* when a worktree with a dev container config opens outside one        |
+| `settingsTemplate`    | `.vscode/settings.shared.json` | Tracked template merged into untracked `settings.json` (see below); empty disables          |
 | `setupCommands`       | `[]`             | `["npm install", ...]` — commands run **once** on first setup (sequential, stop on first failure)   |
 | `runSetupInDevContainer` | `false`       | Run `setupCommands` in dev-container windows too (normally `postCreateCommand` owns bootstrap)      |
 | `terminals`           | `[]`             | `[{ "name": "...", "command": "..." }]` — terminals to open (omit/empty `command` → plain terminal) |

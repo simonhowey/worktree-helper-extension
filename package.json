@@ -2,7 +2,7 @@
   "name": "worktree-helper",
   "displayName": "Worktree Helper",
   "description": "Makes each git worktree window visually distinct and context-aware: titlebar color, branch/color env vars, and auto-opened terminals.",
-  "version": "0.2.1",
+  "version": "0.4.0",
   "publisher": "simonhowey",
   "license": "MIT",
   "engines": {
@@ -63,6 +63,16 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Also apply config to the primary working tree, not just linked worktrees."
+        },
+        "worktreeHelper.settingsTemplate": {
+          "type": "string",
+          "default": ".vscode/settings.shared.json",
+          "markdownDescription": "Workspace-relative path of a **tracked** settings template. When the file exists, its top-level keys are deep-merged into (untracked, gitignored) `.vscode/settings.json` on window open and whenever the template changes — template wins per key, keys it doesn't define (e.g. titlebar colors) are left alone, and a `null` value deletes the key. Runs in every trusted window, not just worktrees, since the generated `settings.json` is the only settings file VS Code reads. Empty disables."
+        },
+        "worktreeHelper.autoReopenInContainer": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "When a worktree window opens outside a container and the folder has a dev container config, automatically run *Dev Containers: Reopen in Container*. Best enabled per-repo in the checked-in `.vscode/settings.json`. Note: while this is on, *Reopen Folder Locally* will bounce straight back into the container — disable the setting first to work locally."
         },
         "worktreeHelper.setupCommands": {
           "type": "array",
@@ -169,6 +179,7 @@
     "@types/vscode": "^1.103.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
+    "jsonc-parser": "^3.3.1",
     "typescript": "^5.6.0"
   }
 }

@@ -13,6 +13,7 @@ import {
 import { applyEnv, clearEnv } from './env';
 import { openTerminals, hasOurTerminals } from './terminals';
 import { runSetupCommands } from './setup';
+import { applySettingsTemplate, watchSettingsTemplate } from './settings-template';
 import {
   isApplied,
   setApplied,
@@ -33,6 +34,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('worktreeHelper.pickColor', () => pickColor(context)),
     vscode.commands.registerCommand('worktreeHelper.runSetup', () => runSetup(context)),
   );
+  const folder = activeFolder();
+  const templateRel = getConfig(folder?.uri).settingsTemplate;
+  if (folder && templateRel) {
+    context.subscriptions.push(watchSettingsTemplate(folder, templateRel));
+  }
   void applyWorktreeConfig(context, false);
 }
 
@@ -96,6 +102,17 @@ async function resolveColor(
 }
 
 async function applyWorktreeConfig(context: vscode.ExtensionContext, force: boolean): Promise<void> {
+  // Settings template first, and BEFORE reading config — on a fresh worktree the
+  // worktreeHelper.* settings themselves come from the generated settings.json.
+  // Not worktree-gated: settings.json is untracked in template repos, so every
+  // window (main checkout included) must materialize it.
+  const templateFolder = activeFolder();
+  if (templateFolder && vscode.workspace.isTrusted) {
+    const templateRel = getConfig(templateFolder.uri).settingsTemplate;
+    if (templateRel && (await applySettingsTemplate(templateFolder, templateRel))) {
+      await configRefreshed(2000);
+    }
+  }
   const config = getConfig(activeFolder()?.uri);
   if (!config.autoApply && !force) {
     return;
@@ -105,6 +122,11 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
     return;
   }
   const { folder, repo, gitPath } = resolved;
+  // Hand off to the dev container before any local-side work — the window is
+  // about to reload, and color/env/terminals get applied in the container window.
+  if (repo && (await maybeReopenInContainer(folder, config))) {
+    return;
+  }
   if (!repo) {
     // Remote window whose path isn't mirrored on the host (non-path-preserving
     // mount): git is unusable there, but color + terminals still work.
@@ -169,6 +191,66 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
 
   await setApplied(context, repo.commonDir, folder.uri.fsPath);
   log(`Applied worktree config: branch=${repo.branch}, color=${background}.`);
+}
+
+/**
+ * Resolve when VS Code's configuration model has caught up with an on-disk
+ * settings.json write (it refreshes via file watcher, asynchronously), or after
+ * the timeout — whichever comes first.
+ */
+function configRefreshed(timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    const done = (): void => {
+      listener.dispose();
+      clearTimeout(timer);
+      resolve();
+    };
+    const listener = vscode.workspace.onDidChangeConfiguration(done);
+    const timer = setTimeout(done, timeoutMs);
+  });
+}
+
+/**
+ * If enabled and this window is not already inside a container, hand the folder
+ * to the Dev Containers extension. Local and WSL/SSH windows all qualify —
+ * `remoteName` is only a stop signal when it's already a container. Returns
+ * true when a reopen was triggered (the window is about to reload).
+ */
+async function maybeReopenInContainer(
+  folder: vscode.WorkspaceFolder,
+  config: WorktreeConfig,
+): Promise<boolean> {
+  if (!config.autoReopenInContainer) {
+    return false;
+  }
+  if (vscode.env.remoteName === 'dev-container' || vscode.env.remoteName === 'attached-container') {
+    return false;
+  }
+  if (!(await hasDevcontainerConfig(folder.uri))) {
+    return false;
+  }
+  log(`Dev container config found in ${folder.name} — reopening in container.`);
+  try {
+    // Commands resolve across extension hosts — don't getExtension()-check first:
+    // Dev Containers lives in the UI host, invisible from a WSL/SSH workspace host.
+    await vscode.commands.executeCommand('remote-containers.reopenInContainer');
+  } catch (e) {
+    log(`Reopen in Container failed — is the Dev Containers extension installed? (${String(e)})`);
+    return false;
+  }
+  return true;
+}
+
+async function hasDevcontainerConfig(root: vscode.Uri): Promise<boolean> {
+  for (const rel of ['.devcontainer/devcontainer.json', '.devcontainer.json']) {
+    try {
+      await vscode.workspace.fs.stat(vscode.Uri.joinPath(root, rel));
+      return true;
+    } catch {
+      // keep looking
+    }
+  }
+  return false;
 }
 
 // Sentinel in place of commonDir for the applied marker when git is unavailable.

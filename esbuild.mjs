@@ -8,6 +8,9 @@ const ctx = await esbuild.context({
   bundle: true,
   format: 'cjs',
   platform: 'node',
+  // Prefer ESM entries: jsonc-parser's CJS entry is a UMD wrapper whose relative
+  // requires esbuild can't statically bundle (breaks at runtime).
+  mainFields: ['module', 'main'],
   target: 'node18',
   outfile: 'dist/extension.js',
   // 'vscode' is provided by the host at runtime and must not be bundled.
