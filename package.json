@@ -2,7 +2,7 @@
   "name": "worktree-helper",
   "displayName": "Worktree Helper",
   "description": "Makes each git worktree window visually distinct and context-aware: titlebar color, branch/color env vars, and auto-opened terminals.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "simonhowey",
   "license": "MIT",
   "engines": {
@@ -180,7 +180,10 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "package": "vsce package --no-dependencies",
-    "reinstall": "vsce package --no-dependencies -o worktree-helper.vsix && code --install-extension worktree-helper.vsix --force"
+    "reinstall": "vsce package --no-dependencies -o worktree-helper.vsix && code --install-extension worktree-helper.vsix --force",
+    "install:win": "cp worktree-helper.vsix /mnt/c/Windows/Temp/wth.vsix && powershell.exe -NoProfile -Command \"cd C:\\Windows\\Temp; code --install-extension wth.vsix --force\"",
+    "reinstall:win": "vsce package --no-dependencies -o worktree-helper.vsix && npm run install:win",
+    "reinstall:all": "vsce package --no-dependencies -o worktree-helper.vsix && code --install-extension worktree-helper.vsix --force && npm run install:win"
   },
   "devDependencies": {
     "@types/node": "^20.x",
