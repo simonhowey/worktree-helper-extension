@@ -35,9 +35,6 @@ import {
 } from './state';
 import { initLog, log } from './log';
 
-// Sentinel in place of commonDir for the applied marker when git is unavailable.
-const NO_GIT = 'remote-no-git';
-
 export function activate(context: vscode.ExtensionContext): void {
   initLog();
   context.subscriptions.push(
@@ -141,37 +138,8 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
     return;
   }
   const { folder, repo, gitPath } = resolved;
-  const firstApply = force || !isApplied(context, repo?.commonDir ?? NO_GIT, folder.uri.fsPath);
-
-  // Apply the host-inheritable artifacts (titlebar color + owned .env file) BEFORE
-  // any container handoff. The reopened dev-container window does NOT run this
-  // extension (it lives in the local/WSL extension host, not the container's), so
-  // it can't apply them itself — but it inherits both: .vscode/settings.json is read
-  // by the client-side workbench for the titlebar, and .env.worktree is bind-mounted
-  // into the container where the dev server reads it. Terminals and terminal
-  // env-injection can't be inherited across the reload, so they stay after the
-  // handoff (they only take effect when we don't reopen). Awaited, so both writes
-  // are flushed to disk before maybeReopenInContainer reloads the window.
-  let background = '';
-  if (repo) {
-    background = await resolveColor(context, folder, repo, config, gitPath);
-    await applyTitlebar(folder, buildTitlebarColors(background));
-    await setCachedColor(context, folder.uri.fsPath, background);
-    if (firstApply) {
-      await ensureTitleBarStyleCustom();
-    }
-    const envFile = await applyEnv(context, folder, config, { branch: repo.branch, color: background });
-    if (config.gitExcludeWrites) {
-      const patterns = ['/.vscode/settings.json'];
-      if (envFile) {
-        patterns.push(`/${envFile}`);
-      }
-      await ensureGitExclude(repo.commonDir, patterns);
-    }
-  }
-
-  // Hand off to the dev container now that color + .env.worktree are on disk and
-  // will be inherited by the reopened window.
+  // Hand off to the dev container before any local-side work — the window is
+  // about to reload, and color/env/terminals get applied in the container window.
   if (repo && (await maybeReopenInContainer(folder, config))) {
     return;
   }
@@ -182,6 +150,28 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
       await applyDegradedRemote(context, folder, config, force);
     }
     return;
+  }
+  const firstApply = force || !isApplied(context, repo.commonDir, folder.uri.fsPath);
+
+  // Color + titlebar
+  const background = await resolveColor(context, folder, repo, config, gitPath);
+  await applyTitlebar(folder, buildTitlebarColors(background));
+  await setCachedColor(context, folder.uri.fsPath, background);
+  if (firstApply) {
+    await ensureTitleBarStyleCustom();
+  }
+
+  // Env vars (terminals + owned .env file)
+  const envVars = { branch: repo.branch, color: background };
+  const envFile = await applyEnv(context, folder, config, envVars);
+
+  // Keep our writes out of git
+  if (config.gitExcludeWrites) {
+    const patterns = ['/.vscode/settings.json'];
+    if (envFile) {
+      patterns.push(`/${envFile}`);
+    }
+    await ensureGitExclude(repo.commonDir, patterns);
   }
 
   const envRecord = { [config.branchEnvVar]: repo.branch, [config.colorEnvVar]: background };
@@ -306,6 +296,9 @@ async function hasDevcontainerConfig(root: vscode.Uri): Promise<boolean> {
   }
   return false;
 }
+
+// Sentinel in place of commonDir for the applied marker when git is unavailable.
+const NO_GIT = 'remote-no-git';
 
 /**
  * Remote window whose path host-side git can't see (non-path-preserving mount):
