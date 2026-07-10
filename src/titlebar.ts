@@ -9,7 +9,6 @@ import { log } from "./log";
 const OUR_KEYS: (keyof TitlebarColors)[] = [
   "activeBackground",
   "activeForeground",
-  "inactiveForeground",
   "border",
 ];
 
