@@ -26,10 +26,7 @@ function parseHex(hex: string): Rgb | null {
 }
 
 function toHex({ r, g, b }: Rgb): string {
-  const h = (v: number) =>
-    Math.max(0, Math.min(255, Math.round(v)))
-      .toString(16)
-      .padStart(2, "0");
+  const h = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
   return `#${h(r)}${h(g)}${h(b)}`;
 }
 
@@ -54,9 +51,7 @@ export function contrastingForeground(background: string): string {
   const bg = parseHex(background) ?? { r: 0, g: 0, b: 0 };
   const black = { r: 0, g: 0, b: 0 };
   const white = { r: 255, g: 255, b: 255 };
-  return contrastRatio(bg, white) >= contrastRatio(bg, black)
-    ? "#ffffff"
-    : "#000000";
+  return contrastRatio(bg, white) >= contrastRatio(bg, black) ? '#ffffff' : '#000000';
 }
 
 /** Perceptual-ish distance between two colors ("redmean" approximation). */
@@ -65,11 +60,7 @@ function distance(a: Rgb, b: Rgb): number {
   const dr = a.r - b.r;
   const dg = a.g - b.g;
   const db = a.b - b.b;
-  return Math.sqrt(
-    (2 + rmean / 256) * dr * dr +
-      4 * dg * dg +
-      (2 + (255 - rmean) / 256) * db * db,
-  );
+  return Math.sqrt((2 + rmean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rmean) / 256) * db * db);
 }
 
 /** FNV-1a 32-bit string hash — stable across machines, used for deterministic tie-breaks. */
@@ -110,15 +101,8 @@ export function deterministicColor(seed: string): string {
  * still returns the most-distinct one. Falls back to a deterministic color when the
  * palette is empty.
  */
-export function pickDistinctColor(
-  palette: string[],
-  used: string[],
-  seed: string,
-): string {
-  const candidates = palette
-    .map(parseHex)
-    .map((rgb, i) => ({ hex: palette[i], rgb }))
-    .filter((c) => c.rgb);
+export function pickDistinctColor(palette: string[], used: string[], seed: string): string {
+  const candidates = palette.map(parseHex).map((rgb, i) => ({ hex: palette[i], rgb })).filter((c) => c.rgb);
   if (candidates.length === 0) {
     return deterministicColor(seed);
   }
@@ -132,10 +116,7 @@ export function pickDistinctColor(
   let bestScore = -1;
   for (const c of pool) {
     // Distinctness = distance to the nearest already-used color (Infinity if none used).
-    const minDist =
-      usedRgb.length === 0
-        ? Infinity
-        : Math.min(...usedRgb.map((u) => distance(c.rgb!, u)));
+    const minDist = usedRgb.length === 0 ? Infinity : Math.min(...usedRgb.map((u) => distance(c.rgb!, u)));
     // Deterministic, stable jitter in [0,1) so equal-distance candidates resolve the same way.
     const jitter = (hash(seed + c.hex) % 1000) / 1000;
     const score = (minDist === Infinity ? 1e9 : minDist) + jitter;
@@ -150,12 +131,15 @@ export function pickDistinctColor(
 /** Build the full set of titleBar.* values from a chosen background. */
 export function buildTitlebarColors(background: string): TitlebarColors {
   const bg = parseHex(background) ?? { r: 0x12, g: 0x12, b: 0x12 };
+  // Inactive = background muted toward a neutral gray so unfocused windows are dimmer.
+  const gray = { r: 0x80, g: 0x80, b: 0x80 };
+  const inactive = toHex({ r: (bg.r + gray.r) / 2, g: (bg.g + gray.g) / 2, b: (bg.b + gray.b) / 2 });
   const activeBackground = toHex(bg);
   return {
     activeBackground,
     activeForeground: contrastingForeground(activeBackground),
-    inactiveBackground: activeBackground,
-    inactiveForeground: contrastingForeground(activeBackground),
+    inactiveBackground: inactive,
+    inactiveForeground: contrastingForeground(inactive),
     border: activeBackground,
   };
 }
