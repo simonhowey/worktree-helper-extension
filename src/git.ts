@@ -27,12 +27,28 @@ export interface RepoContext {
 }
 
 /** Runs git with the given args in `cwd`. Returns trimmed stdout, or null on any failure. */
-async function git(gitPath: string, cwd: string, args: string[]): Promise<string | null> {
+async function git(gitPath: string, cwd: string, args: string[], timeoutMs?: number): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync(gitPath, args, { cwd, windowsHide: true });
+    const { stdout } = await execFileAsync(gitPath, args, { cwd, windowsHide: true, timeout: timeoutMs });
     return stdout.trim();
   } catch {
     return null;
+  }
+}
+
+/**
+ * Runs git for its exit status (not its output). Resolves the process exit code
+ * (0 = success), or null when git couldn't be spawned or was killed (e.g. timeout).
+ * Needed for commands like `merge-base --is-ancestor` where a non-zero exit is a
+ * meaningful answer, not an error — `git()` would flatten both to null.
+ */
+async function gitExit(gitPath: string, cwd: string, args: string[], timeoutMs?: number): Promise<number | null> {
+  try {
+    await execFileAsync(gitPath, args, { cwd, windowsHide: true, timeout: timeoutMs });
+    return 0;
+  } catch (err) {
+    const code = (err as { code?: unknown }).code;
+    return typeof code === 'number' ? code : null;
   }
 }
 
@@ -92,4 +108,50 @@ export async function listWorktrees(gitPath: string, cwd: string): Promise<Workt
     }
   }
   return trees;
+}
+
+/**
+ * Fetches a single branch from a remote into FETCH_HEAD and returns its commit
+ * SHA, or null on failure (offline, unknown remote/branch, or the timeout fires).
+ * Uses only FETCH_HEAD so it never touches the local `refs/remotes/<remote>/…`
+ * or the checked-out branch — safe to run in any worktree.
+ */
+export async function fetchBranchTip(
+  gitPath: string,
+  cwd: string,
+  remote: string,
+  branch: string,
+  timeoutMs: number,
+): Promise<string | null> {
+  if ((await git(gitPath, cwd, ['fetch', '--no-tags', remote, branch], timeoutMs)) === null) {
+    return null;
+  }
+  return git(gitPath, cwd, ['rev-parse', 'FETCH_HEAD']);
+}
+
+/**
+ * True when `ancestor` is an ancestor of (or equal to) `descendant`; false when
+ * it isn't; null when the comparison couldn't run (bad ref, etc.). Wraps
+ * `git merge-base --is-ancestor`, whose exit code (0/1) is the answer.
+ */
+export async function isAncestor(
+  gitPath: string,
+  cwd: string,
+  ancestor: string,
+  descendant: string,
+): Promise<boolean | null> {
+  const code = await gitExit(gitPath, cwd, ['merge-base', '--is-ancestor', ancestor, descendant]);
+  return code === 0 ? true : code === 1 ? false : null;
+}
+
+/** Counts commits reachable from `to` but not `from` (i.e. `git rev-list --count from..to`). */
+export async function countCommits(gitPath: string, cwd: string, from: string, to: string): Promise<number> {
+  const out = await git(gitPath, cwd, ['rev-list', '--count', `${from}..${to}`]);
+  const n = out ? Number.parseInt(out, 10) : Number.NaN;
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Fast-forwards the current branch to `ref` (`git merge --ff-only`). Returns success. */
+export async function fastForwardTo(gitPath: string, cwd: string, ref: string): Promise<boolean> {
+  return (await gitExit(gitPath, cwd, ['merge', '--ff-only', ref])) === 0;
 }

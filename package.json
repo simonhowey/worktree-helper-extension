@@ -2,7 +2,7 @@
   "name": "worktree-helper",
   "displayName": "Worktree Helper",
   "description": "Makes each git worktree window visually distinct and context-aware: titlebar color, branch/color env vars, and auto-opened terminals.",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "publisher": "simonhowey",
   "license": "MIT",
   "repository": "https://github.com/simonhowey/worktree-helper-extension",
@@ -171,6 +171,21 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Add files we write (`.vscode/settings.json`, `.env`) to `.git/info/exclude` so they don't pollute git."
+        },
+        "worktreeHelper.checkStaleBase": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When a worktree is first opened, warn if it was branched from an out-of-date base — the *forgot to pull `#worktreeHelper.baseBranch#` before making the worktree* mistake. Fetches `#worktreeHelper.baseRemote#/#worktreeHelper.baseBranch#`; if this worktree is behind it and has no commits of its own, shows a modal offering a one-click fast-forward. Silent for branches that have diverged (real work of their own). Runs once per worktree, before any dev-container reopen."
+        },
+        "worktreeHelper.baseRemote": {
+          "type": "string",
+          "default": "origin",
+          "description": "Remote to fetch the base branch from for the stale-base check."
+        },
+        "worktreeHelper.baseBranch": {
+          "type": "string",
+          "default": "main",
+          "description": "Base branch new worktrees are expected to build on (e.g. main or master), used by the stale-base check."
         }
       }
     }

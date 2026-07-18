@@ -13,6 +13,9 @@ other way), this extension automatically:
 - **c) Runs one-time setup commands** (e.g. `npm install`, copying untracked config) when a
   worktree is first set up — run as tasks, awaited, and re-tried until they succeed.
 - **d) Opens configured terminals** in the worktree folder, each running a program you specify.
+- **e) Guards against a stale base** — if the worktree was branched from an out-of-date
+  `main` (the "forgot to pull before making the worktree" mistake), it offers a one-click
+  fast-forward before you start work. See [Stale-base guard](#stale-base-guard).
 
 It does **not** create worktrees — VS Code 1.103+ already does that. This extension reacts to a
 worktree being opened and configures the window.
@@ -30,6 +33,7 @@ On activation (`onStartupFinished`, in every window) the extension:
 6. Runs `setupCommands` sequentially — **once per worktree**, awaited so terminals start only
    after setup finishes. Marked done only when every command exits 0, so a failure re-runs next open.
 7. Opens the configured terminals — **once per worktree** (guarded so reloads don't duplicate them).
+8. Runs the [stale-base guard](#stale-base-guard) — **once per worktree**, before any container reopen.
 
 Color and env reconcile on every activation; setup commands and terminals run only on first setup.
 The setup marker is independent of the apply marker, so _Re-apply Config_ refreshes visuals/env
@@ -171,6 +175,9 @@ All under `worktreeHelper.*`:
 | `colorEnvVar`         | `WORKTREE_COLOR` | Color env var name                                                                                  |
 | `openTerminals`       | `true`           | Open the configured terminals                                                                       |
 | `gitExcludeWrites`    | `true`           | Add our files to `.git/info/exclude`                                                                |
+| `checkStaleBase`      | `true`           | Warn + offer a fast-forward when a worktree is branched off a stale base (see below)                |
+| `baseRemote`          | `origin`         | Remote to fetch the base branch from for the stale-base check                                       |
+| `baseBranch`          | `main`           | Base branch new worktrees should build on (e.g. `main`/`master`)                                    |
 
 Example — open a dev server and a shell in every worktree:
 
@@ -196,6 +203,32 @@ Example — install deps and seed local config once per worktree:
 `setupCommands` vs `terminals`: setup commands are run **once** and expected to _finish_ (the
 window waits for them before opening terminals); terminals are for long-running processes like
 dev servers. Put `npm install` in `setupCommands`, `npm run dev` in `terminals`.
+
+## Stale-base guard
+
+A common worktree mistake: you create a worktree while your local `main` is behind
+`origin/main`, so the new branch starts from stale code. VS Code creates worktrees by shelling
+out to `git worktree add` and exposes **no pre-creation hook** to extensions, so this can't be
+blocked _before_ the worktree exists — instead the guard catches it the instant the worktree
+window opens (once per worktree, before any dev-container reopen so the fix lands before the
+container builds):
+
+1. Fetches `baseRemote/baseBranch` (default `origin/main`) into `FETCH_HEAD` — a `--no-tags`
+   fetch that never touches your local refs. Skips silently if offline (retries next open).
+2. If the base tip is already in the worktree's history → up to date, nothing happens.
+3. If the worktree is **behind** the base **and has no commits of its own** (so a fast-forward
+   is lossless), it shows a modal:
+
+   > Worktree "feat/x" was branched from a main that is 4 commit(s) behind origin/main.
+   > **[Update to origin/main]** **[Keep anyway]**
+
+   _Update_ runs `git merge --ff-only`, leaving the branch exactly as if you'd pulled `main`
+   first. _Keep anyway_ leaves it untouched.
+4. Branches that have **diverged** (their own commits) are left alone — being behind `main`
+   mid-feature is normal, and re-nagging would be noise.
+
+Turn it off with `worktreeHelper.checkStaleBase: false`; point it at a different default branch
+with `worktreeHelper.baseBranch` / `worktreeHelper.baseRemote`.
 
 ## Commands
 

@@ -22,6 +22,9 @@ export interface WorktreeConfig {
   colorEnvVar: string;
   openTerminals: boolean;
   gitExcludeWrites: boolean;
+  checkStaleBase: boolean;
+  baseRemote: string;
+  baseBranch: string;
 }
 
 /** Reads `worktreeHelper.*` settings for the given folder scope, with defaults from the manifest. */
@@ -44,6 +47,9 @@ export function getConfig(scope?: vscode.ConfigurationScope): WorktreeConfig {
     colorEnvVar: get('colorEnvVar', 'WORKTREE_COLOR').trim() || 'WORKTREE_COLOR',
     openTerminals: get('openTerminals', true),
     gitExcludeWrites: get('gitExcludeWrites', true),
+    checkStaleBase: get('checkStaleBase', true),
+    baseRemote: get('baseRemote', 'origin').trim() || 'origin',
+    baseBranch: get('baseBranch', 'main').trim() || 'main',
   };
 }
 

@@ -39,6 +39,21 @@ export function clearSetupDone(ctx: vscode.ExtensionContext, commonDir: string, 
   return ctx.workspaceState.update(setupKey(commonDir, worktreePath), undefined);
 }
 
+// Durable per-worktree marker so the stale-base check runs once (not on every
+// reload / container reopen). Set only after a fetch actually completed, so an
+// offline first open retries rather than being skipped forever.
+function staleKey(commonDir: string, worktreePath: string): string {
+  return `staleChecked:${commonDir}:${worktreePath}`;
+}
+
+export function isStaleChecked(ctx: vscode.ExtensionContext, commonDir: string, worktreePath: string): boolean {
+  return ctx.workspaceState.get<boolean>(staleKey(commonDir, worktreePath)) === true;
+}
+
+export function setStaleChecked(ctx: vscode.ExtensionContext, commonDir: string, worktreePath: string): Thenable<void> {
+  return ctx.workspaceState.update(staleKey(commonDir, worktreePath), true);
+}
+
 const COLOR_CACHE = 'colorCache';
 
 type ColorCache = Record<string, string>;

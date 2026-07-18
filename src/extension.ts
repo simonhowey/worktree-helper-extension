@@ -11,6 +11,7 @@ import {
   readSiblingBackgrounds,
 } from './titlebar';
 import { applyEnv, clearEnv } from './env';
+import { warnIfStaleBase } from './stale-base';
 import { openTerminals, hasOurTerminals } from './terminals';
 import { runSetupCommands } from './setup';
 import { applySettingsTemplate, watchSettingsTemplate } from './settings-template';
@@ -30,6 +31,8 @@ import {
   isSetupDone,
   setSetupDone,
   clearSetupDone,
+  isStaleChecked,
+  setStaleChecked,
   getCachedColor,
   setCachedColor,
 } from './state';
@@ -167,6 +170,22 @@ async function applyWorktreeConfig(context: vscode.ExtensionContext, force: bool
         patterns.push(`/${envFile}`);
       }
       await ensureGitExclude(repo.commonDir, patterns);
+    }
+  }
+
+  // Stale-base guard — catch a worktree branched off an out-of-date base (the
+  // "forgot to pull main" mistake). Run BEFORE any container handoff so the modal
+  // isn't killed by the reload and the fix lands before the container builds;
+  // once per worktree (marked only when a fetch actually completed). Linked
+  // worktrees only — the main checkout isn't where new work is started.
+  if (
+    repo &&
+    repo.isLinkedWorktree &&
+    config.checkStaleBase &&
+    !isStaleChecked(context, repo.commonDir, folder.uri.fsPath)
+  ) {
+    if (await warnIfStaleBase(gitPath, folder.uri.fsPath, repo.branch, config)) {
+      await setStaleChecked(context, repo.commonDir, folder.uri.fsPath);
     }
   }
 
